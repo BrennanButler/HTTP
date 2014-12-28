@@ -34,5 +34,6 @@ int SocketListen(int socket, int numConnections);
 
 void ShutdownSocket();
 
+SOCKET sock;
 
 #endif

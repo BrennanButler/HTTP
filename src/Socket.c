@@ -1,35 +1,44 @@
-#include "Socket.h"
+/*
+	Copyright 2014 Brennan Butler
 
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+	
+
+	Socket.c -
+		
+		Handles setting up the sockets and recieving and sending of data.
+*/
+
+#include "Socket.h"
 
 char response[] = "HTTP/1.x 200 OK\n"
 "Content-Type: text/html; charset=UTF-8\nContent-Length: 100\nConnection: close\n\n"
-"<doctype !html><html><head><title>faggot</title></head>"
-"<body><h1>You're a faggot.</h1></body></html>\n";
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-SOCKET sock;
-#else
-int sock;
-#endif
+"<doctype !html><html><head><title>Test</title></head>"
+"<body><h1>This is a test.</h1></body></html>\n";
 
 int SetupSocket()
 {
-	//char recvbuffer[512];
-	struct sockaddr_in serverinfo, cli_addr;
-	socklen_t sin_len = sizeof(cli_addr);
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 	SOCKET client;
 	WSADATA data;
-	if(FAILED(WSAStartup(MAKEWORD(2, 2), &data)))
+	char recvbuffer[512];
+	struct sockaddr_in serverinfo;
+	int bytesReceived = 0;
+
+	if (WSAStartup(MAKEWORD(2, 2), &data) != NO_ERROR)
 	{
 		printf("WSAStartup failed << Windows\n");
 		return 0;
 	}
-
-#else
-	int client;
-#endif
 
 	memset(&serverinfo, 0, sizeof(serverinfo));
 
@@ -37,20 +46,20 @@ int SetupSocket()
 	serverinfo.sin_addr.s_addr = htonl(INADDR_ANY);
 	serverinfo.sin_port = htons(80);
 
-	if ((sock = socket(2, 1, 0)) == -1)
+
+	if ((sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == INVALID_SOCKET)
 	{
+		printf("Error sock()");
+		printf("\n%d last error \n", WSAGetLastError());
 		WSACleanup();
 		return 0;
 	}
 
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-	if ((bind(sock, (SOCKADDR *)&serverinfo, sizeof(serverinfo))) == -1)
+	if ((bind(sock, (SOCKADDR *)&serverinfo, sizeof(serverinfo))) == SOCKET_ERROR)
 	{
+		printf("\n%d last error \n", WSAGetLastError());
 		WSACleanup();
-#else
-	if ((bind(sock, (struct sockaddr *)&serverinfo, sizeof(struct sockaddr_un))) == -1)
-	{
-#endif
+		printf("Error binding");
 		closesocket(sock);
 		return 0;
 	}
@@ -63,52 +72,43 @@ int SetupSocket()
 
 	while (1)
 	{
-		client = accept(sock, (struct sockaddr *)&cli_addr, &sin_len);
+		client = accept(sock, NULL, NULL);
 
-		if (client == -1)
-			continue;
+		if (client == INVALID_SOCKET)
+			printf("\n%d last error \n", WSAGetLastError());
 
-		//recv(sock, recvbuffer, 512, 0);
+		bytesReceived = recv(client, recvbuffer, 512, 0);
 
-		//printf("%s", recvbuffer);
+		if (bytesReceived == -1)
+			printf("\n%d last error \n", WSAGetLastError());
+
+		printf("%d\n\n", bytesReceived);
+
+		recvbuffer[bytesReceived] = 0;
+
+		printf("%s\n", recvbuffer);
 
 		send(client, response, strlen(response), 0);
-		
+
 		closesocket(client);
 	}
+
 	return 1;
 }
-
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 
 int SocketListen(SOCKET socket, int numConnections)
 {
-	if ((listen(socket, numConnections)) == -1)
+	if ((listen(socket, numConnections)) == SOCKET_ERROR)
 	{
+		printf("\n%d last error \n", WSAGetLastError());
 		WSACleanup();
-		closesocket(socket);
+		closesocket(sock);
 		return 0;
 	}
 	return 1;
 }
-
-
-#else
-
-int SocketListen(int socket, int numConnections)
-{
-	if ((listen(socket, numConnections)) == -1)
-	{
-		closesocket(socket);
-		return 0;
-	}
-	return 1;
-}
-
-#endif
 
 void ShutdownSocket()
 {
-	closesocket(sock);
-	printf("Closed socket");
+
 }
